@@ -16,47 +16,47 @@ transport layer gets swapped for whatever the target platform provides.
 └─────────────────────────────────────────────┘
 ```
 
-**Rule of thumb:** if a function touches `socket`, `file`, `subprocess`, or `time.sleep` —
+**Rule of thumb:** if a function touches `socket`, `file`, `subprocess`, or `time.sleep`,
 it belongs to the platform layer. Everything else is a direct translation.
 
 ## Checklist
 
 ### codec (no IO, no allocation beyond output buffers)
 
-- [ ] `varint(u64)` — 7-bit groups, `0x80` continuation, little-endian group order
-- [ ] `fstr(field, bytes)` — tag `(field<<3)|2`, length varint, payload
-- [ ] `fvar(field, i64)` — tag `(field<<3)|0`; negative values: add `2^64` before varint
+- [ ] `varint(u64)`: 7-bit groups, `0x80` continuation, little-endian group order
+- [ ] `fstr(field, bytes)`: tag `(field<<3)|2`, length varint, payload
+- [ ] `fvar(field, i64)`: tag `(field<<3)|0`; negative values: add `2^64` before varint
       (int64 two's complement → 10 bytes)
-- [ ] `payload(bssids, neighbours)` — `field2{field1=bssid}` × N, then `field3=0`,
+- [ ] `payload(bssids, neighbours)`: `field2{field1=bssid}` × N, then `field3=0`,
       `field4=0|1` (0 = return neighbours)
-- [ ] `batches(bssids, neighbours)` — greedy: `size += 4 + len(bssid)`, flush when
+- [ ] `batches(bssids, neighbours)`: greedy: `size += 4 + len(bssid)`, flush when
       `size + cost > 255`, initial size = overhead of field3+field4 (4 bytes)
-- [ ] `envelope(payload)` — fixed 50-byte prefix (constants below) + 1 length byte
-- [ ] `pb_decode(buf)` — generic protobuf walker: wire type 0 (varint, signed via
-      `>= 2^63 ? v - 2^64 : v`), 2 (length-delimited), 1/5 (fixed — skip), anything else
+- [ ] `envelope(payload)`: fixed 50-byte prefix (constants below) + 1 length byte
+- [ ] `pb_decode(buf)`: generic protobuf walker: wire type 0 (varint, signed via
+      `>= 2^63 ? v - 2^64 : v`), 2 (length-delimited), 1/5 (fixed, skip), anything else
       = stop
-- [ ] `parse_fixes(body)` — gunzip if magic `1f 8b`; skip 10-byte header; walk field-2
+- [ ] `parse_fixes(body)`: gunzip if magic `1f 8b`; skip 10-byte header; walk field-2
       devices; inner field1 = BSSID string, field2 = location message (fields 1/2/3 =
       lat/lng/acc); `/1e8`; drop `-180` sentinel; clamp accuracy to `[0,10000]`;
       normalize + dedupe BSSIDs
-- [ ] `norm(bssid)` — lowercase, colon-separated, zero-padded octets; accept 6 raw bytes
+- [ ] `norm(bssid)`: lowercase, colon-separated, zero-padded octets; accept 6 raw bytes
       and bare 12-hex strings
 
 ### algorithm (no IO)
 
-- [ ] `_haversine(lat1, lng1, lat2, lng2)` — R = 6 371 000 m
-- [ ] `reject_outliers` — **median** lat/lng as center (not mean!), threshold
+- [ ] `_haversine(lat1, lng1, lat2, lng2)`: R = 6 371 000 m
+- [ ] `reject_outliers`: **median** lat/lng as center (not mean!), threshold
       `max(100, 3 × median_accuracy)`, fall back to full list if all rejected
-- [ ] `weighted_centroid` — `w = 1/(1 + acc²)`, acc defaults to 50 when null
-- [ ] `spread` — max pairwise haversine distance
-- [ ] `confidence` — `0.3 + min(0.4, 0.1×(n−1)) + min(0.3, 0.3×(1−min(spread,100)/100))`
-- [ ] `accuracy` — `max(max_acc, spread/2)`
+- [ ] `weighted_centroid`: `w = 1/(1 + acc²)`, acc defaults to 50 when null
+- [ ] `spread`: max pairwise haversine distance
+- [ ] `confidence`: `0.3 + min(0.4, 0.1×(n−1)) + min(0.3, 0.3×(1−min(spread,100)/100))`
+- [ ] `accuracy`: `max(max_acc, spread/2)`
 
 ### transport (platform-specific)
 
 - [ ] HTTPS POST, keep-alive across batches, 0.5 s min spacing
 - [ ] Headers exactly as in RE doc §4.1 (UA, content-type, accept-encoding)
-- [ ] gzip decode (mandatory — some responses compress regardless of headers)
+- [ ] gzip decode (mandatory: some responses compress regardless of headers)
 - [ ] Retries: 3, exponential backoff 0.6/1.2/2.4 s, honor `Retry-After` on 429
 - [ ] Throttle: ≥17 fixes → set `num_wifi_results=1` for next 10 s (suppress, don't sleep)
 - [ ] Fallback: primary fails → retry once against
@@ -66,17 +66,17 @@ it belongs to the platform layer. Everything else is a direct translation.
 
 ### ESP32-specific notes
 
-- Scan via `esp_wifi_scan` + `esp_wifi_ap_record_t.bssid` / `rssi` (true dBm — skip the
+- Scan via `esp_wifi_scan` + `esp_wifi_ap_record_t.bssid` / `rssi` (true dBm, so skip the
   netsh %-conversion entirely); feed `AccessPoint.from_raw(mac6, rssi)` equivalents.
 - Heap: batch payloads ≤ 255 B, response for a neighbours query ≈ 8–15 KB compressed /
-  ~60 KB raw — budget a 64 KB read buffer or parse incrementally from the socket.
+  ~60 KB raw, so budget a 64 KB read buffer or parse incrementally from the socket.
 - Non-blocking: run the query on a worker task; `Location` assembly is microseconds.
 
 ---
 
 ## Golden test vectors
 
-Assert these byte-for-byte — they are what the Python implementation produces and what the
+Assert these byte-for-byte: they are what the Python implementation produces and what the
 live server accepts.
 
 ### 1. Varint encodings
@@ -88,7 +88,7 @@ live server accepts.
 | `10820785522` | `f2aae0a728` |
 | `-180` (as int64, i.e. `2^64 − 180`) | `ccfeffffffffffffff01` |
 
-### 2. Request payload — one BSSID, neighbours on
+### 2. Request payload: one BSSID, neighbours on
 
 Input: `["aa:bb:cc:dd:ee:ff"]`, `neighbours=True` (`field4 = 0`)
 
@@ -193,4 +193,4 @@ After porting, run in order:
 3. **Live:** single-BSSID query against the real endpoint; expect HTTP 200 and a fix near
    the AP's true location (±50 m), or a clean sentinel drop for an unknown BSSID.
 4. **End-to-end:** full scan → query → centroid; compare against the Python
-   implementation on the same BSSID set — positions should agree to < 1 m (identical math).
+   implementation on the same BSSID set; positions should agree to < 1 m (identical math).

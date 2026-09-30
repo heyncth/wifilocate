@@ -7,7 +7,7 @@ without any official schema.
 - **Endpoint:** `https://gs-loc.apple.com/clls/wloc`
 - **Protocol:** HTTPS POST, custom 50-byte binary envelope wrapping a Protocol Buffers message
 - **Client:** `locationd` (the daemon behind CoreLocation on iOS/macOS)
-- **Status:** private, undocumented, no API key, no auth — but also no stability guarantees
+- **Status:** private, undocumented, no API key, no auth, but also no stability guarantees
 
 Most overviews of "Wi-Fi geolocation APIs" stop at REST services with a JSON body. Apple's
 service is different: the body is a hand-rolled envelope around a binary protobuf message,
@@ -24,15 +24,15 @@ while it performs Wi-Fi positioning. Two complementary approaches work.
 
 ### 1.1 Dynamic analysis: MITM the device
 
-This is the most direct path — intercept the TLS connection `locationd` opens when it asks
+This is the most direct path: intercept the TLS connection `locationd` opens when it asks
 Apple for the positions of nearby access points.
 
-1. **Run a proxy on your computer** — mitmproxy, Charles, or Burp Suite.
+1. **Run a proxy on your computer**: mitmproxy, Charles, or Burp Suite.
 2. **Install the proxy's CA certificate on the device:**
    - iOS: visit the proxy's install URL (e.g. `http://mitm.it`), install the profile, then
      enable full trust in *Settings → General → About → Certificate Trust Settings*.
    - macOS: install the CA into the System keychain and mark it trusted.
-3. **Route the device's traffic through the proxy** — same Wi-Fi with manual proxy config,
+3. **Route the device's traffic through the proxy**: same Wi-Fi with manual proxy config,
    or a tethered connection.
 4. **Trigger a Wi-Fi positioning request.** `locationd` fires when Location Services is
    enabled and the device needs a network-based fix, for example:
@@ -44,7 +44,7 @@ Apple for the positions of nearby access points.
 
 Key observations from doing this:
 
-- `locationd` uses the system TLS stack (CFNetwork) and **does not pin certificates** —
+- `locationd` uses the system TLS stack (CFNetwork) and **does not pin certificates**, so
   once the proxy CA is trusted, the request/response are fully readable.
 - The same message pattern also shows up against `iphone-services.apple.com/clls/wloc`
   (an alternate host serving the same service) and against a China mirror
@@ -66,7 +66,7 @@ Traffic capture gives you bytes; disassembly gives you names.
   `User-Agent` header and the `com.apple.locationd` bundle identifier baked into the
   envelope.
 
-Between the two — bytes from the wire, names from the binary — the whole protocol becomes
+Put the two together (bytes from the wire, names from the binary) and the whole protocol becomes
 recoverable without Apple ever publishing a `.proto` file.
 
 ---
@@ -81,14 +81,14 @@ A typical commercial geolocation API accepts a JSON body:
 
 One POST, `Content-Type: application/json`, response is JSON. Trivial to call from anything.
 
-Apple's endpoint looks superficially similar — one POST — but every layer under the header
+Apple's endpoint looks superficially similar, one POST, but every layer under the header
 is binary:
 
 | | Typical JSON API | Apple WLOC |
 | --- | --- | --- |
 | Request body | JSON text | Custom 50-byte envelope + protobuf |
 | `Content-Type` | `application/json` | `application/x-www-form-urlencoded` **(wrong/misleading)** |
-| Schema | Published OpenAPI/JSON schema | None — recovered from captures + disassembly |
+| Schema | Published OpenAPI/JSON schema | None, recovered from captures + disassembly |
 | Encoding | UTF-8, self-describing | Protobuf varints: compact, not human-readable |
 | Response | JSON with field names | Binary stream, 10-byte header, then protobuf |
 | Numbers | JSON floats | Fixed-point integers (`×1e8`), sentinel values |
@@ -97,7 +97,7 @@ Two consequences that decide the whole implementation:
 
 1. **The header lies.** The real captured header dump (see §4.1) says
    `Content-Type: application/x-www-form-urlencoded`, yet the body is neither form data nor
-   URL-encoded — it is binary. Any client that tries to parse the body as a form will fail.
+   URL-encoded: it is binary. Any client that tries to parse the body as a form will fail.
    The server apparently does not care what the header claims.
 2. **You need a schema, or you need to write one.** Standard practice is to reconstruct a
    `.proto` file from captured messages (aided by the disassembled field names) and generate
@@ -141,15 +141,15 @@ message Device {
 }
 ```
 
-Note the field numbers: there is no field `1` at the top level — the outer message starts
+Note the field numbers: there is no field `1` at the top level, and the outer message starts
 at `2`. That is a fingerprint of a schema that evolved over time, and a good sign you are
-looking at the real format rather than a cleaned-up reconstruction.
+looking at the real format, not a cleaned-up reconstruction.
 
 `num_wifi_results` (field 4) is the single most useful knob:
 
-- `0` — Apple returns the requested BSSIDs **plus up to ~100 surrounding access points** it
+- `0`: Apple returns the requested BSSIDs **plus up to ~100 surrounding access points** it
   believes are nearby. Bigger picture, wider spread.
-- `1` — Apple returns **only the BSSIDs you asked for**. Tight, fast, fewer bytes.
+- `1`: Apple returns **only the BSSIDs you asked for**. Tight and fast.
 
 ### 3.2 Batching
 
@@ -180,7 +180,7 @@ User-Agent: locationd/1753.17 CFNetwork/711.1.12 Darwin/14.0.0
 The `User-Agent` is the tell: `locationd` + a CFNetwork build string + a Darwin version.
 Reproducing it makes the request indistinguishable from a real device as far as the
 server appears to care. Responses may arrive gzip-compressed despite the form-urlencoded
-content type — decompress on `Content-Encoding: gzip` (and defensively if the body starts
+content type, so decompress on `Content-Encoding: gzip` (and defensively if the body starts
 with the gzip magic `1f 8b`).
 
 ### 4.2 The 50-byte envelope
@@ -244,7 +244,7 @@ field3 (varint)        tag = (3<<3)|0 = 0x18, then value
 field4 (varint)        tag = (4<<3)|0 = 0x20, then value
 ```
 
-Negative int64s are encoded as unsigned 64-bit two's complement — i.e. a 10-byte varint
+Negative int64s are encoded as unsigned 64-bit two's complement, i.e. a 10-byte varint
 (`value + 2^64`). This matters for the `-180` sentinel in responses (§5.2).
 
 ### 4.4 Request example, full hex
@@ -265,7 +265,7 @@ full body (75 bytes):
   12130a1161613a62623a63633a64643a65653a666618002000
 ```
 
-(These are the exact golden vectors the test suite asserts against — see
+(These are the exact golden vectors the test suite asserts against; see
 [PORTING.md](PORTING.md).)
 
 ---
@@ -282,7 +282,7 @@ full body (75 bytes):
 ```
 
 - **First 10 bytes are a fixed header** (a response counterpart of the request envelope).
-  Their contents are not needed for parsing — skip them and decode the remainder.
+  Their contents are not needed for parsing: skip them and decode the remainder.
 - The rest is a protobuf message whose field 2 (wire type 2) repeats once per access
   point:
 
@@ -309,13 +309,13 @@ message Wifi {
 1. **Scale:** `latitude = raw / 1e8`. `1601742172 → 16.01742172`.
 2. **Sentinel:** an unknown BSSID comes back with `latitude = longitude = -180`
    (encoded as a 10-byte two's-complement varint, unsigned value `2^64 − 180`) and
-   typically `accuracy = -1`. Drop these — the BSSID simply is not in Apple's database.
+   typically `accuracy = -1`. Drop these: the BSSID simply is not in Apple's database.
    Sanity-check `accuracy` to `[0, 10000]`; anything else is treated as absent.
 3. **Echo quirk:** the response string is echoed verbatim, and echoes may be
-   *non-canonical* — single-digit octets appear (`24:b:2b:11:5d:d9`). The parser must
+   *non-canonical*: single-digit octets appear (`24:b:2b:11:5d:d9`). The parser must
    zero-pad octets, not assume `^[0-9a-f]{2}(:...){5}$`.
-4. **Dedupe:** later entries for the same (normalized) BSSID win; first response wins in
-   practice — the list is deduplicated on insert.
+4. **Dedupe:** the first response for a normalized BSSID wins; later duplicates are
+   ignored on insert.
 5. **Compression:** if the body starts with `1f 8b`, gunzip first (some paths compress
    even when not announced).
 
@@ -343,7 +343,7 @@ Requests were sent with deliberately malformed inputs; the table is what came ba
 | Input form | Sent as | Result |
 | --- | --- | --- |
 | `24:0b:2b:11:5d:d9` (canonical, lowercase) | verbatim | normal response with fixes |
-| `240b2b115dd9` (no separators) | verbatim | **empty 10-byte response** — server expects a text MAC |
+| `240b2b115dd9` (no separators) | verbatim | **empty 10-byte response**: server expects a text MAC |
 | uppercase / single-digit octets | normalized client-side | response may echo non-canonical form (§5.2) |
 | unknown BSSID | valid MAC | sentinel `-180` entry, `accuracy = -1` |
 | 40+ BSSIDs | batched ≤ 255 B | multiple requests, all answered normally |
@@ -354,7 +354,7 @@ Practical rules the library enforces as a result:
 - **Normalize before sending:** lowercase, colon-separated, zero-padded octets
   (`wifilocate.norm()` accepts `str`, hex strings, 6 raw bytes, `-`/`.` separators).
 - **Normalize again on receive**, because the echo is not trustworthy.
-- **Never trust the `Content-Type`** — parse bytes, not form data.
+- **Never trust the `Content-Type`**: parse bytes, not form data.
 
 ---
 
@@ -366,8 +366,8 @@ The server rewards restraint. Observed behavior during bulk testing:
   permissive "dump" mode; continuing to request surrounding neighbours in that state risks
   degraded answers and `429 Too Many Requests`.
 - The client therefore treats "returned ≥ 17 fixes" as a **throttle signal** and switches
-  to `num_wifi_results = 1` (requested BSSIDs only) for the next **10 seconds** — it stops
-  *asking for extra data*, it does not sleep.
+  to `num_wifi_results = 1` (requested BSSIDs only) for the next **10 seconds**. It stops
+  *asking for extra data*; it does not sleep.
 - A naive interpretation (sleep 10 s on the signal) measured **10.9 s** for a
   requested-only query and **20.5 s** for a neighbours query. The correct interpretation
   (suppress neighbours instead of sleeping) measured **2.3 s** for both.
@@ -394,7 +394,7 @@ HTTP-level handling as a second line of defense:
 The library uses the GrapheneOS proxy as an **automatic fallback**: if the primary endpoint
 errors out (network-level failure, blocking), the same query is retried there, and the
 resulting `Location.source` records which host answered. Custom endpoints are exempt from
-fallback — if you point the client somewhere yourself, failures propagate to you.
+fallback: if you point the client somewhere yourself, failures propagate to you.
 
 ---
 
@@ -406,7 +406,7 @@ Two valid strategies:
    field names, optional-field semantics, and future fields for free. Cost: a code-generation
    step and a protobuf runtime dependency.
 2. **Hand-roll the codec** (what this library does). The protocol uses only varints,
-   length-delimited strings, and one nesting level — ~40 lines to encode, ~60 lines to
+   length-delimited strings, and one nesting level: ~40 lines to encode, ~60 lines to
    decode:
 
 ```python
@@ -430,8 +430,7 @@ The decoder mirrors it: read tag → switch on wire type → recurse into wire-t
 Anything unrecognized ends parsing gracefully (unknown wire types 3/4 are treated as
 end-of-stream), so a future field added by Apple does not crash old clients.
 
-This trade-off — no schema, no codegen, zero dependencies — is the right call for a
+This trade-off (no schema, no codegen, zero dependencies) is the right call for a
 single-file library and for embedded ports where `protoc` output is unwanted. It is also
-exactly why this endpoint gets skipped by generic API tutorials: someone has to do the byte
-work first. This document, plus the golden vectors in [PORTING.md](PORTING.md), is that work
-written down.
+exactly why generic API tutorials skip this endpoint: someone has to do the byte work
+first.

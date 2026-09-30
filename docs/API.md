@@ -1,6 +1,6 @@
 # API Reference
 
-`wifilocate.py` — single file, stdlib only, Python ≥ 3.9.
+`wifilocate.py` is a single file, stdlib only, Python ≥ 3.9.
 
 ```python
 from wifilocate import HuyLocationAlgorithm, geolocate, AccessPoint, AppleError
@@ -66,7 +66,7 @@ Duplicates are removed (by normalized BSSID), order preserved.
 | Message | Cause |
 | --- | --- |
 | `no access points` | scan returned nothing / empty input list |
-| `no access points resolved` | Apple answered but none of your BSSIDs exist in its database — `exc.unknown` lists them |
+| `no access points resolved` | Apple answered but none of your BSSIDs exist in its database (`exc.unknown` lists them) |
 | `rate limited` | HTTP 429 persisted through all retries |
 | `failed after N tries: ...` | network/TLS failures through all retries |
 | `HTTP <status>: ...` | any other non-200 response |
@@ -85,7 +85,7 @@ else:
 
 ---
 
-## `geolocate(...)` — module-level one-shot
+## `geolocate(...)`: module-level one-shot
 
 ```python
 from wifilocate import geolocate
@@ -168,8 +168,8 @@ AccessPoint(bssid: str, rssi: int | None = None,
 ```
 
 - `AccessPoint.from_raw(mac: bytes, rssi=None, channel=None, ssid=None) -> AccessPoint`
-  — build from a 6-byte MAC (`len(mac)` must be 6, else `ValueError`).
-- `.location -> bool` — `True` if `bssid` matches the canonical MAC pattern.
+  Builds from a 6-byte MAC (`len(mac)` must be 6, else `ValueError`).
+- `.location -> bool`: `True` if `bssid` matches the canonical MAC pattern.
 - `rssi`/`channel`/`ssid` are informational: only `rssi` affects filtering; the wire
   protocol carries BSSID only.
 
@@ -177,7 +177,7 @@ AccessPoint(bssid: str, rssi: int | None = None,
 
 ## `AppleClient`
 
-Low-level client (transport + codec only — no centroid logic). Connection is opened lazily,
+Low-level client (transport + codec only, no centroid logic). Connection is opened lazily,
 closed after `query()` or by `close()` / context exit.
 
 ```python
@@ -244,7 +244,7 @@ Normalize any BSSID representation to canonical `aa:bb:cc:dd:ee:ff`:
 
 Internal tuning constants (codec limits, throttle, retry) live at module top as
 `ENVELOPE_LEN`, `MAX_PAYLOAD`, `SCALE`, `THROTTLE_*`, `TIMEOUT`, `RETRIES`, `BACKOFF`,
-`DELAY`, `MIN_RSSI_*`, `OUTLIER_CAP_M` — documented in RE/ALGORITHM docs rather than here.
+`DELAY`, `MIN_RSSI_*`, `OUTLIER_CAP_M`; see the RE and ALGORITHM docs for their rationale.
 
 ---
 

@@ -1,7 +1,7 @@
 # wifilocate
 
 Single-file Python library that turns Wi-Fi BSSIDs into geographic coordinates by speaking the
-same binary protocol as Apple's `locationd` — **no API key, no dependencies, stdlib only**.
+same binary protocol as Apple's `locationd`. No API key, no dependencies, stdlib only.
 
 ```
 BSSID list  →  Apple WLOC (gs-loc.apple.com)  →  lat/lng ± accuracy
@@ -14,14 +14,14 @@ BSSID list  →  Apple WLOC (gs-loc.apple.com)  →  lat/lng ± accuracy
 
 ## Features
 
-- **Zero dependencies** — Python ≥ 3.9 stdlib only (`http.client`, `ssl`, `gzip`)
-- **One file** — drop `wifilocate.py` into any project
-- **No API key** — speaks Apple's protobuf-in-envelope protocol directly
-- **Auto mode** — scans nearby networks with `netsh` (Windows) when you pass no BSSIDs
-- **Batching** — greedy chunking to the 255-byte payload limit, keep-alive connections
-- **Hardening** — RSSI filtering, median-based outlier rejection, HTTP 429 backoff,
+- **Zero dependencies**: Python ≥ 3.9 stdlib only (`http.client`, `ssl`, `gzip`)
+- **One file**: drop `wifilocate.py` into any project
+- **No API key**: speaks Apple's protobuf-in-envelope protocol directly
+- **Auto mode**: scans nearby networks with `netsh` (Windows) when you pass no BSSIDs
+- **Batching**: greedy chunking to the 255-byte payload limit, keep-alive connections
+- **Hardening**: RSSI filtering, median-based outlier rejection, HTTP 429 backoff,
   throttle-aware neighbour suppression, automatic fallback endpoint
-- **Portable core** — codec and algorithm layers perform no IO: a 1:1 port target for C++/ESP32
+- **Portable core**: codec and algorithm layers perform no IO: a 1:1 port target for C++/ESP32
 
 ## Quickstart
 
@@ -45,7 +45,7 @@ from wifilocate import geolocate
 loc = geolocate()   # scans and queries in one call
 ```
 
-Feed it anything — a string, raw 6 bytes from an ESP32 `wifi_ap_record_t`, or `AccessPoint` objects:
+Feed it anything: a string, raw 6 bytes from an ESP32 `wifi_ap_record_t`, or `AccessPoint` objects:
 
 ```python
 from wifilocate import geolocate, AccessPoint
@@ -97,8 +97,8 @@ which widens the spread but adds context. Ground truth from the OS location API 
 4. **Aggregate** with median-outlier rejection and an accuracy-weighted centroid
    (`w = 1/(1 + acc²)`), then report accuracy, spread, and confidence.
 
-Details — including how the endpoint and wire format were reverse engineered from device
-traffic — in [docs/REVERSE_ENGINEERING.md](docs/REVERSE_ENGINEERING.md).
+The endpoint and wire format came out of real device traffic; the full walkthrough lives in
+[docs/REVERSE_ENGINEERING.md](docs/REVERSE_ENGINEERING.md).
 
 ## License
 
